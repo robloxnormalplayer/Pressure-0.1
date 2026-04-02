@@ -32,22 +32,23 @@ local KEYCARDS = {
     PasswordPaper = { label = "Password",      fill = Color3.fromRGB(0,   200, 80),  outline = Color3.fromRGB(100, 255, 150) },
 }
 
-local ITEMS = {
-    Lantern      = { label = "Lantern",       fill = Color3.fromRGB(255, 200, 0),   outline = Color3.fromRGB(255, 230, 100) },
-    Flashlight   = { label = "Flashlight",    fill = Color3.fromRGB(200, 200, 255), outline = Color3.fromRGB(255, 255, 255) },
-    Blacklight   = { label = "Blacklight",    fill = Color3.fromRGB(150, 0,   255), outline = Color3.fromRGB(200, 100, 255) },
-    Medkit       = { label = "Medkit",        fill = Color3.fromRGB(255, 50,  50),  outline = Color3.fromRGB(255, 150, 150) },
-    HealthBoost  = { label = "Health Boost",  fill = Color3.fromRGB(255, 100, 100), outline = Color3.fromRGB(255, 180, 180) },
-    Defib        = { label = "Defib",         fill = Color3.fromRGB(255, 0,   100), outline = Color3.fromRGB(255, 100, 180) },
-    FlashBeacon  = { label = "Flash Beacon",  fill = Color3.fromRGB(255, 255, 50),  outline = Color3.fromRGB(255, 255, 150) },
-    Scanner      = { label = "Scanner",       fill = Color3.fromRGB(0,   255, 200), outline = Color3.fromRGB(100, 255, 230) },
-    Notebook     = { label = "Notebook",      fill = Color3.fromRGB(200, 150, 50),  outline = Color3.fromRGB(230, 190, 120) },
-    Book         = { label = "Book",          fill = Color3.fromRGB(180, 120, 40),  outline = Color3.fromRGB(220, 170, 100) },
-    CodeBreacher = { label = "Code Breacher", fill = Color3.fromRGB(0,   200, 255), outline = Color3.fromRGB(100, 230, 255) },
-    Gummylight   = { label = "Gummylight",    fill = Color3.fromRGB(255, 100, 200), outline = Color3.fromRGB(255, 180, 230) },
-    WindupLight  = { label = "Windup Light",  fill = Color3.fromRGB(255, 180, 50),  outline = Color3.fromRGB(255, 210, 120) },
-    SPRINT       = { label = "SPRINT",        fill = Color3.fromRGB(50,  255, 100), outline = Color3.fromRGB(150, 255, 180) },
-    ToyRemote    = { label = "Toy Remote",    fill = Color3.fromRGB(100, 100, 255), outline = Color3.fromRGB(180, 180, 255) },
+-- Itens com variantes de nome (ex: BigFlashBeacon, FlashBeaconHighGrade)
+local ITEM_PATTERNS = {
+    { pattern = "Lantern",      label = "Lantern",       fill = Color3.fromRGB(255, 200, 0),   outline = Color3.fromRGB(255, 230, 100) },
+    { pattern = "Flashlight",   label = "Flashlight",    fill = Color3.fromRGB(200, 200, 255), outline = Color3.fromRGB(255, 255, 255) },
+    { pattern = "Blacklight",   label = "Blacklight",    fill = Color3.fromRGB(150, 0,   255), outline = Color3.fromRGB(200, 100, 255) },
+    { pattern = "Medkit",       label = "Medkit",        fill = Color3.fromRGB(255, 50,  50),  outline = Color3.fromRGB(255, 150, 150) },
+    { pattern = "HealthBoost",  label = "Health Boost",  fill = Color3.fromRGB(255, 100, 100), outline = Color3.fromRGB(255, 180, 180) },
+    { pattern = "Defib",        label = "Defib",         fill = Color3.fromRGB(255, 0,   100), outline = Color3.fromRGB(255, 100, 180) },
+    { pattern = "FlashBeacon",  label = "Flash Beacon",  fill = Color3.fromRGB(255, 255, 50),  outline = Color3.fromRGB(255, 255, 150) },
+    { pattern = "Scanner",      label = "Scanner",       fill = Color3.fromRGB(0,   255, 200), outline = Color3.fromRGB(100, 255, 230) },
+    { pattern = "Notebook",     label = "Notebook",      fill = Color3.fromRGB(200, 150, 50),  outline = Color3.fromRGB(230, 190, 120) },
+    { pattern = "^Book$",       label = "Book",          fill = Color3.fromRGB(180, 120, 40),  outline = Color3.fromRGB(220, 170, 100) },
+    { pattern = "CodeBreacher", label = "Code Breacher", fill = Color3.fromRGB(0,   200, 255), outline = Color3.fromRGB(100, 230, 255) },
+    { pattern = "Gummylight",   label = "Gummylight",    fill = Color3.fromRGB(255, 100, 200), outline = Color3.fromRGB(255, 180, 230) },
+    { pattern = "WindupLight",  label = "Windup Light",  fill = Color3.fromRGB(255, 180, 50),  outline = Color3.fromRGB(255, 210, 120) },
+    { pattern = "SPRINT",       label = "SPRINT",        fill = Color3.fromRGB(50,  255, 100), outline = Color3.fromRGB(150, 255, 180) },
+    { pattern = "ToyRemote",    label = "Toy Remote",    fill = Color3.fromRGB(100, 100, 255), outline = Color3.fromRGB(180, 180, 255) },
 }
 
 local MONSTERS = {
@@ -87,11 +88,13 @@ local CURRENCY_PATTERNS = {
 -- HELPERS
 -- ================================================
 
-local function IsCurrencyOrBlueprint(name)
-    for _, e in ipairs(CURRENCY_PATTERNS) do
-        if string.match(name, e.pattern) then return true end
+local function GetItemConfig(name)
+    for _, e in ipairs(ITEM_PATTERNS) do
+        if string.match(name, e.pattern) then
+            return { label = e.label, fill = e.fill, outline = e.outline }
+        end
     end
-    return false
+    return nil
 end
 
 local function GetCurrencyConfig(name)
@@ -103,30 +106,25 @@ local function GetCurrencyConfig(name)
     return nil
 end
 
-local function IsTurret(name)
-    return name == "Turret"
+local function IsCurrencyOrBlueprint(name)
+    return GetCurrencyConfig(name) ~= nil
 end
 
-local function CreateAntiToggle(tab, name, flag, matchFn)
-    local conn = nil
-    tab:CreateToggle({
-        Name = name, CurrentValue = false, Flag = flag,
-        Callback = function(Value)
-            if Value then
-                local function removeInRoom(room)
-                    for _, d in pairs(room:GetDescendants()) do
-                        if matchFn(d.Name) then pcall(function() d:Destroy() end) end
-                    end
+-- Cache de proxies para Currency Aura
+local currencyProxyCache = {}
+
+local function RebuildCurrencyCache()
+    currencyProxyCache = {}
+    for _, room in pairs(Rooms:GetChildren()) do
+        for _, d in pairs(room:GetDescendants()) do
+            if IsCurrencyOrBlueprint(d.Name) then
+                local proxy = d:FindFirstChild("ProxyPart")
+                if proxy then
+                    currencyProxyCache[proxy] = true
                 end
-                for _, room in pairs(Rooms:GetChildren()) do removeInRoom(room) end
-                conn = Rooms.ChildAdded:Connect(function(room)
-                    task.wait(0.5) removeInRoom(room)
-                end)
-            else
-                if conn then conn:Disconnect() conn = nil end
             end
         end
-    })
+    end
 end
 
 -- ================================================
@@ -176,34 +174,55 @@ local function RemoveESP(part)
     if b then b:Destroy() end
 end
 
-local function CreateESPToggle(tab, name, flag, getConfig, getTarget)
+-- Função genérica de scan por rooms
+local function ScanRooms(matchFn, onFound)
     local connections = {}
     local roomConn = nil
+
+    local function scanDesc(d)
+        local config = matchFn(d.Name)
+        if config then
+            local target = d:FindFirstChild("ProxyPart") or d
+            onFound(target, config)
+        end
+    end
+
+    local function scanRoom(room)
+        for _, d in pairs(room:GetDescendants()) do
+            pcall(scanDesc, d)
+        end
+    end
+
+    for _, room in pairs(Rooms:GetChildren()) do
+        scanRoom(room)
+        table.insert(connections, room.DescendantAdded:Connect(function(d)
+            task.wait(0.1)
+            pcall(scanDesc, d)
+        end))
+    end
+
+    roomConn = Rooms.ChildAdded:Connect(function(room)
+        task.wait(0.5)
+        scanRoom(room)
+        table.insert(connections, room.DescendantAdded:Connect(function(d)
+            task.wait(0.1)
+            pcall(scanDesc, d)
+        end))
+    end)
+
+    return connections, roomConn
+end
+
+local function CreateESPToggle(tab, name, flag, matchFn)
+    local connections = {}
+    local roomConn = nil
+
     tab:CreateToggle({
         Name = name, CurrentValue = false, Flag = flag,
         Callback = function(Value)
             if Value then
-                local function scanDesc(d)
-                    local config = getConfig(d.Name)
-                    if config then
-                        local target = getTarget and getTarget(d) or d
-                        if target then AddESP(target, config) end
-                    end
-                end
-                local function scanRoom(room)
-                    for _, d in pairs(room:GetDescendants()) do scanDesc(d) end
-                end
-                for _, room in pairs(Rooms:GetChildren()) do
-                    scanRoom(room)
-                    table.insert(connections, room.DescendantAdded:Connect(function(d)
-                        task.wait(0.1) scanDesc(d)
-                    end))
-                end
-                roomConn = Rooms.ChildAdded:Connect(function(room)
-                    task.wait(0.5) scanRoom(room)
-                    table.insert(connections, room.DescendantAdded:Connect(function(d)
-                        task.wait(0.1) scanDesc(d)
-                    end))
+                connections, roomConn = ScanRooms(matchFn, function(target, config)
+                    AddESP(target, config)
                 end)
             else
                 if roomConn then roomConn:Disconnect() roomConn = nil end
@@ -211,10 +230,37 @@ local function CreateESPToggle(tab, name, flag, getConfig, getTarget)
                 connections = {}
                 for _, room in pairs(Rooms:GetChildren()) do
                     for _, d in pairs(room:GetDescendants()) do
-                        local target = getTarget and getTarget(d) or d
-                        if target then RemoveESP(target) end
+                        pcall(RemoveESP, d:FindFirstChild("ProxyPart") or d)
                     end
                 end
+            end
+        end
+    })
+end
+
+-- Anti genérico
+local function CreateAntiToggle(tab, name, flag, matchFn)
+    local conn = nil
+    tab:CreateToggle({
+        Name = name, CurrentValue = false, Flag = flag,
+        Callback = function(Value)
+            if Value then
+                local function removeInRoom(room)
+                    for _, d in pairs(room:GetDescendants()) do
+                        if matchFn(d.Name) then pcall(function() d:Destroy() end) end
+                    end
+                end
+                for _, room in pairs(Rooms:GetChildren()) do removeInRoom(room) end
+                conn = Rooms.ChildAdded:Connect(function(room)
+                    task.wait(0.1)
+                    removeInRoom(room)
+                    -- Detecta descendants novos dentro da sala
+                    room.DescendantAdded:Connect(function(d)
+                        if matchFn(d.Name) then pcall(function() d:Destroy() end) end
+                    end)
+                end)
+            else
+                if conn then conn:Disconnect() conn = nil end
             end
         end
     })
@@ -227,18 +273,15 @@ end
 Esp:CreateSection("Items")
 
 CreateESPToggle(Esp, "Keycard ESP", "EspKeycard",
-    function(n) return KEYCARDS[n] end,
-    function(d) return d:FindFirstChild("ProxyPart") or d end
+    function(n) return KEYCARDS[n] end
 )
 
 CreateESPToggle(Esp, "Currency & Blueprint ESP", "EspCurrency",
-    function(n) return GetCurrencyConfig(n) end,
-    function(d) return d:FindFirstChild("ProxyPart") or d end
+    function(n) return GetCurrencyConfig(n) end
 )
 
 CreateESPToggle(Esp, "Item ESP", "EspItems",
-    function(n) return ITEMS[n] end,
-    function(d) return d:FindFirstChild("ProxyPart") or d end
+    function(n) return GetItemConfig(n) end
 )
 
 Esp:CreateSection("Monsters")
@@ -249,28 +292,18 @@ Esp:CreateToggle({
     Name = "Monster Locker ESP", CurrentValue = false, Flag = "EspMonsterLocker",
     Callback = function(Value)
         local cfg = { label = "⚠ MONSTER LOCKER", fill = Color3.fromRGB(200, 0, 0), outline = Color3.fromRGB(255, 80, 80), textColor = Color3.fromRGB(255, 80, 80), fillTransparency = 0.3 }
-        local function scanDesc(d)
-            if d.Name == "MonsterLocker" then AddESP(d, cfg) end
-        end
-        local function scanRoom(room)
-            for _, d in pairs(room:GetDescendants()) do scanDesc(d) end
-        end
         if Value then
-            for _, room in pairs(Rooms:GetChildren()) do
-                scanRoom(room)
-                table.insert(lockerConns, room.DescendantAdded:Connect(function(d) task.wait(0.1) scanDesc(d) end))
-            end
-            lockerRoomConn = Rooms.ChildAdded:Connect(function(room)
-                task.wait(0.5) scanRoom(room)
-                table.insert(lockerConns, room.DescendantAdded:Connect(function(d) task.wait(0.1) scanDesc(d) end))
-            end)
+            lockerConns, lockerRoomConn = ScanRooms(
+                function(n) return n == "MonsterLocker" and cfg or nil end,
+                function(target, config) AddESP(target, config) end
+            )
         else
             if lockerRoomConn then lockerRoomConn:Disconnect() lockerRoomConn = nil end
             for _, c in pairs(lockerConns) do c:Disconnect() end
             lockerConns = {}
             for _, room in pairs(Rooms:GetChildren()) do
                 for _, d in pairs(room:GetDescendants()) do
-                    if d.Name == "MonsterLocker" then RemoveESP(d) end
+                    if d.Name == "MonsterLocker" then pcall(RemoveESP, d) end
                 end
             end
         end
@@ -283,28 +316,24 @@ Esp:CreateToggle({
     Name = "Fake Door ESP", CurrentValue = false, Flag = "EspFakeDoor",
     Callback = function(Value)
         local cfg = { label = "✖ FAKE DOOR", fill = Color3.fromRGB(180, 0, 0), outline = RED, textColor = RED, fillTransparency = 0.3 }
-        local function scanDesc(d)
-            if d.Name == "Door" and d.Parent and d.Parent.Name == "TricksterDoor" then AddESP(d, cfg) end
-        end
-        local function scanRoom(room)
-            for _, d in pairs(room:GetDescendants()) do scanDesc(d) end
-        end
         if Value then
-            for _, room in pairs(Rooms:GetChildren()) do
-                scanRoom(room)
-                table.insert(fakeDoorConns, room.DescendantAdded:Connect(function(d) task.wait(0.1) scanDesc(d) end))
-            end
-            fakeDoorRoomConn = Rooms.ChildAdded:Connect(function(room)
-                task.wait(0.5) scanRoom(room)
-                table.insert(fakeDoorConns, room.DescendantAdded:Connect(function(d) task.wait(0.1) scanDesc(d) end))
-            end)
+            fakeDoorConns, fakeDoorRoomConn = ScanRooms(
+                function(n) return n == "Door" and cfg or nil end,
+                function(target, config)
+                    if target.Parent and target.Parent.Name == "TricksterDoor" then
+                        AddESP(target, config)
+                    end
+                end
+            )
         else
             if fakeDoorRoomConn then fakeDoorRoomConn:Disconnect() fakeDoorRoomConn = nil end
             for _, c in pairs(fakeDoorConns) do c:Disconnect() end
             fakeDoorConns = {}
             for _, room in pairs(Rooms:GetChildren()) do
                 for _, d in pairs(room:GetDescendants()) do
-                    if d.Name == "Door" and d.Parent and d.Parent.Name == "TricksterDoor" then RemoveESP(d) end
+                    if d.Name == "Door" and d.Parent and d.Parent.Name == "TricksterDoor" then
+                        pcall(RemoveESP, d)
+                    end
                 end
             end
         end
@@ -317,11 +346,17 @@ Esp:CreateToggle({
     Name = "Monster ESP", CurrentValue = false, Flag = "EspMonster",
     Callback = function(Value)
         local cfg = { fill = Color3.fromRGB(200, 0, 0), outline = Color3.fromRGB(255, 200, 0), textColor = RED, fillTransparency = 0.3 }
+        local tracked = {}
         local function applyESP(child)
+            if tracked[child] then return end
+            tracked[child] = true
             cfg.label = "☠ " .. child.Name
-            AddESP(child, cfg)
+            pcall(AddESP, child, cfg)
             table.insert(monsterEspConns, child.AncestryChanged:Connect(function()
-                if not child:IsDescendantOf(game) then RemoveESP(child) end
+                if not child:IsDescendantOf(game) then
+                    pcall(RemoveESP, child)
+                    tracked[child] = nil
+                end
             end))
         end
         local function scanContainer(container)
@@ -339,10 +374,10 @@ Esp:CreateToggle({
             for _, c in pairs(monsterEspConns) do c:Disconnect() end
             monsterEspConns = {}
             for _, child in pairs(workspace:GetChildren()) do
-                if MONSTERS[child.Name] then RemoveESP(child) end
+                if MONSTERS[child.Name] then pcall(RemoveESP, child) end
             end
             for _, child in pairs(workspace.GameplayFolder.Monsters:GetChildren()) do
-                RemoveESP(child)
+                pcall(RemoveESP, child)
             end
         end
     end
@@ -428,21 +463,36 @@ Auto:CreateToggle({
     Name = "Currency Aura", CurrentValue = false, Flag = "CurrencyAura",
     Callback = function(Value)
         if Value then
+            -- Constrói cache inicial
+            RebuildCurrencyCache()
+
+            -- Listener para novos itens
+            local newItemConn = Rooms.ChildAdded:Connect(function(room)
+                task.wait(0.5)
+                room.DescendantAdded:Connect(function(d)
+                    if IsCurrencyOrBlueprint(d.Name) then
+                        local proxy = d:FindFirstChild("ProxyPart")
+                        if proxy then currencyProxyCache[proxy] = true end
+                    end
+                end)
+            end)
+
             task.spawn(function()
                 while Value do
-                    for _, room in pairs(Rooms:GetChildren()) do
-                        for _, d in pairs(room:GetDescendants()) do
-                            if IsCurrencyOrBlueprint(d.Name) then
-                                local proxy = d:FindFirstChild("ProxyPart")
-                                if proxy then
-                                    local prompt = proxy:FindFirstChildOfClass("ProximityPrompt")
-                                    if prompt and prompt.Enabled then fireproximityprompt(prompt) end
-                                end
+                    for proxy in pairs(currencyProxyCache) do
+                        if proxy and proxy.Parent then
+                            local prompt = proxy:FindFirstChildOfClass("ProximityPrompt")
+                            if prompt and prompt.Enabled then
+                                pcall(fireproximityprompt, prompt)
                             end
+                        else
+                            currencyProxyCache[proxy] = nil
                         end
                     end
                     task.wait(0.5)
                 end
+                if newItemConn then newItemConn:Disconnect() end
+                currencyProxyCache = {}
             end)
         end
     end
@@ -452,13 +502,6 @@ Auto:CreateToggle({
 -- ANTIS
 -- ================================================
 
-Anti:CreateSection("Spawns")
-CreateAntiToggle(Anti, "Remove Turrets",        "RemoveTurrets",      IsTurret)
-CreateAntiToggle(Anti, "Remove Searchlights",   "RemoveSearchlights", function(n) return n == "Searchlights" end)
-CreateAntiToggle(Anti, "Remove Tripwires",      "RemoveTripwires",    function(n) return n == "Tripwire" end)
-CreateAntiToggle(Anti, "Remove Landmines",      "RemoveLandmines",    function(n) return n == "Scorchmark" end)
-CreateAntiToggle(Anti, "Remove DiVine",         "RemoveDiVine",       function(n) return n == "DiVine" or n == "DiVineRoot" end)
-
 Anti:CreateSection("Monsters")
 
 -- Remove Eyefestation + Mute Song
@@ -466,43 +509,49 @@ Anti:CreateToggle({
     Name = "Remove Eyefestation", CurrentValue = false, Flag = "RemoveEyefestation",
     Callback = function(Value)
         local conn = nil
-        local muteLoop = nil
+        local muteConn = nil
 
         local function muteSong(mute)
             pcall(function()
                 local song = game:GetService("Players").LocalPlayer.PlayerGui.Main.Client.MainClient.LocalEntities.Eyefestation.Song
                 song.Volume = mute and 0 or 1
+                if mute and not muteConn then
+                    muteConn = song:GetPropertyChangedSignal("Volume"):Connect(function()
+                        if song.Volume > 0 then song.Volume = 0 end
+                    end)
+                end
             end)
         end
 
         if Value then
-            -- Remove spawns
             local function removeInRoom(room)
                 for _, d in pairs(room:GetDescendants()) do
-                    if d.Name == "EyefestationSpawn" then
-                        pcall(function() d:Destroy() end)
-                    end
+                    if d.Name == "EyefestationSpawn" then pcall(function() d:Destroy() end) end
                 end
             end
             for _, room in pairs(Rooms:GetChildren()) do removeInRoom(room) end
             conn = Rooms.ChildAdded:Connect(function(room)
-                task.wait(0.5) removeInRoom(room)
+                task.wait(0.1)
+                removeInRoom(room)
+                room.DescendantAdded:Connect(function(d)
+                    if d.Name == "EyefestationSpawn" then pcall(function() d:Destroy() end) end
+                end)
             end)
-
-            -- Muta o som continuamente
             muteSong(true)
-            muteLoop = task.spawn(function()
-                while Value do
-                    muteSong(true)
-                    task.wait(1)
-                end
-            end)
         else
             if conn then conn:Disconnect() conn = nil end
-            if muteLoop then task.cancel(muteLoop) muteLoop = nil end
+            if muteConn then muteConn:Disconnect() muteConn = nil end
             muteSong(false)
         end
     end
 })
+
+CreateAntiToggle(Anti, "Remove DiVine",       "RemoveDiVine",       function(n) return n == "DiVine" or n == "DiVineRoot" end)
+CreateAntiToggle(Anti, "Remove Searchlights", "RemoveSearchlights", function(n) return n == "Searchlights" end)
+
+Anti:CreateSection("Spawns")
+CreateAntiToggle(Anti, "Remove Turrets",   "RemoveTurrets",   function(n) return n == "Turret" end)
+CreateAntiToggle(Anti, "Remove Tripwires", "RemoveTripwires", function(n) return n == "Tripwire" end)
+CreateAntiToggle(Anti, "Remove Landmines", "RemoveLandmines", function(n) return n == "Scorchmark" end)
 
 Rayfield:LoadConfiguration()
