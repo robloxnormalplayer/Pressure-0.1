@@ -1,9 +1,13 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- ================================================
+-- MAIN WINDOW
+-- ================================================
+
 local Window = Rayfield:CreateWindow({
-    Name = "Pressure 0.2",
+    Name = "Pressure 0.3",
     Icon = 0,
-    LoadingTitle = "Pressure 0.2",
+    LoadingTitle = "Pressure 0.3",
     LoadingSubtitle = "by normalplayer",
     Theme = {
         TextColor = Color3.fromRGB(200, 225, 255),
@@ -47,20 +51,28 @@ local Window = Rayfield:CreateWindow({
 
 task.wait(2)
 Rayfield:Notify({
-    Title = "Pressure 0.2",
+    Title = "Pressure 0.3",
     Content = "Please report any bugs in the comments of ScriptBlox, or leave a suggestion!",
     Duration = 8,
     Image = "message-circle",
+})
+
+
+local Updates = Window:CreateTab("Updates", "file-text")
+Updates:CreateParagraph({
+    Title = "Version 0.3",
+    Content = "- Fixed Monster Dodge (now lifts 30 studs above, suggestion of: HCZyu)\n- Fixed Generator ESP\n- Fixed toggles not properly disabling\n- Added Anti-Statue\n- Added Generator ESP\n- Improved performance (less lag when opening doors)\n- Added Changelog window\n- Fixed Pandemonium notification spam\n- Fixed Anti toggles not working in every room"
 })
 
 local Esp    = Window:CreateTab("Visuals", "eye")
 local Auto   = Window:CreateTab("Automations", "zap")
 local Anti   = Window:CreateTab("Antis", "shield")
 
-local WHITE  = Color3.fromRGB(255, 255, 255)
-local RED    = Color3.fromRGB(255, 0, 0)
-local Rooms  = workspace.GameplayFolder.Rooms
-local Player = game:GetService("Players").LocalPlayer
+local WHITE      = Color3.fromRGB(255, 255, 255)
+local RED        = Color3.fromRGB(255, 0, 0)
+local Rooms      = workspace.GameplayFolder.Rooms
+local Player     = game:GetService("Players").LocalPlayer
+local RunService = game:GetService("RunService")
 
 -- ================================================
 -- CONFIGS
@@ -151,11 +163,25 @@ local function GetRootPart()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
+local function GetHumanoid()
+    local char = Player.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+-- Debounce de notificações
+local lastNotify = {}
+local function NotifyOnce(key, title, content, duration, image)
+    if lastNotify[key] and (tick() - lastNotify[key]) < 8 then return end
+    lastNotify[key] = tick()
+    Rayfield:Notify({ Title = title, Content = content, Duration = duration, Image = image })
+end
+
 -- ================================================
 -- ESP FUNCTIONS
 -- ================================================
 
 local function AddESP(part, config)
+    if not part or not part.Parent then return end
     if part:FindFirstChildOfClass("Highlight") then return end
 
     local h = Instance.new("Highlight")
@@ -192,17 +218,23 @@ local function AddESP(part, config)
 end
 
 local function RemoveESP(part)
+    if not part then return end
     local h = part:FindFirstChildOfClass("Highlight")
     if h then h:Destroy() end
     local b = part:FindFirstChild("ESP_Label")
     if b then b:Destroy() end
 end
 
-local function ScanRooms(matchFn, onFound)
+-- ScanRooms otimizado com scanned cache para evitar lag
+local function ScanRooms(enabled, matchFn, onFound)
     local connections = {}
-    local roomConn = nil
+    local scanned = {}
 
-    local function scanDesc(d)
+    local function processDesc(d)
+        if scanned[d] then return end
+        scanned[d] = true
+        if not d.Parent then return end
+        -- Só processa folhas ou objetos relevantes
         local config = matchFn(d.Name)
         if config then
             local target = d:FindFirstChild("ProxyPart") or d
@@ -211,71 +243,101 @@ local function ScanRooms(matchFn, onFound)
     end
 
     local function scanRoom(room)
-        for _, d in pairs(room:GetDescendants()) do pcall(scanDesc, d) end
+        for _, d in ipairs(room:GetDescendants()) do
+            if not enabled() then break end
+            processDesc(d)
+        end
     end
 
-    for _, room in pairs(Rooms:GetChildren()) do
+    for _, room in ipairs(Rooms:GetChildren()) do
+        if not enabled() then break end
+        task.defer(function() scanRoom(room) end)
+        table.insert(connections, room.DescendantAdded:Connect(function(d)
+            task.wait(0.1)
+            if enabled() then processDesc(d) end
+        end))
+    end
+
+    table.insert(connections, Rooms.ChildAdded:Connect(function(room)
+        task.wait(0.3)
+        if not enabled() then return end
         scanRoom(room)
         table.insert(connections, room.DescendantAdded:Connect(function(d)
-            task.wait(0.1) pcall(scanDesc, d)
+            task.wait(0.1)
+            if enabled() then processDesc(d) end
         end))
-    end
+    end))
 
-    roomConn = Rooms.ChildAdded:Connect(function(room)
-        task.wait(0.5) scanRoom(room)
-        table.insert(connections, room.DescendantAdded:Connect(function(d)
-            task.wait(0.1) pcall(scanDesc, d)
-        end))
-    end)
-
-    return connections, roomConn
+    return connections
 end
 
 local function CreateESPToggle(tab, name, flag, matchFn)
     local connections = {}
-    local roomConn = nil
+    local active = false
+
     tab:CreateToggle({
         Name = name, CurrentValue = false, Flag = flag,
         Callback = function(Value)
+            active = Value
             if Value then
-                connections, roomConn = ScanRooms(matchFn, function(target, config)
-                    AddESP(target, config)
-                end)
+                connections = ScanRooms(
+                    function() return active end,
+                    matchFn,
+                    function(target, config) AddESP(target, config) end
+                )
             else
-                if roomConn then roomConn:Disconnect() roomConn = nil end
-                for _, c in pairs(connections) do c:Disconnect() end
+                for _, c in ipairs(connections) do c:Disconnect() end
                 connections = {}
-                for _, room in pairs(Rooms:GetChildren()) do
-                    for _, d in pairs(room:GetDescendants()) do
-                        pcall(RemoveESP, d:FindFirstChild("ProxyPart") or d)
+                task.defer(function()
+                    for _, room in ipairs(Rooms:GetChildren()) do
+                        for _, d in ipairs(room:GetDescendants()) do
+                            pcall(RemoveESP, d:FindFirstChild("ProxyPart") or d)
+                        end
                     end
-                end
+                end)
             end
         end
     })
 end
 
+-- Anti genérico otimizado
 local function CreateAntiToggle(tab, name, flag, matchFn)
-    local conn = nil
+    local conns = {}
+    local active = false
+
     tab:CreateToggle({
         Name = name, CurrentValue = false, Flag = flag,
         Callback = function(Value)
+            active = Value
             if Value then
-                local function removeInRoom(room)
-                    for _, d in pairs(room:GetDescendants()) do
-                        if matchFn(d.Name) then pcall(function() d:Destroy() end) end
+                local function destroyIfMatch(d)
+                    if not active then return end
+                    if matchFn(d.Name) then
+                        pcall(function() d:Destroy() end)
                     end
                 end
-                for _, room in pairs(Rooms:GetChildren()) do removeInRoom(room) end
-                conn = Rooms.ChildAdded:Connect(function(room)
-                    task.wait(0.1)
-                    removeInRoom(room)
-                    room.DescendantAdded:Connect(function(d)
-                        if matchFn(d.Name) then pcall(function() d:Destroy() end) end
+                local function setupRoom(room)
+                    task.defer(function()
+                        if not active then return end
+                        for _, d in ipairs(room:GetDescendants()) do
+                            destroyIfMatch(d)
+                        end
                     end)
-                end)
+                    table.insert(conns, room.DescendantAdded:Connect(function(d)
+                        task.wait(0.05)
+                        if active then destroyIfMatch(d) end
+                    end))
+                end
+                for _, room in ipairs(Rooms:GetChildren()) do
+                    setupRoom(room)
+                end
+                table.insert(conns, Rooms.ChildAdded:Connect(function(room)
+                    task.wait(0.3)
+                    if active then setupRoom(room) end
+                end))
             else
-                if conn then conn:Disconnect() conn = nil end
+                for _, c in ipairs(conns) do c:Disconnect() end
+                conns = {}
             end
         end
     })
@@ -287,35 +349,30 @@ end
 
 Esp:CreateSection("Items")
 
-CreateESPToggle(Esp, "Keycard ESP", "EspKeycard",
-    function(n) return KEYCARDS[n] end
-)
-CreateESPToggle(Esp, "Currency & Blueprint ESP", "EspCurrency",
-    function(n) return GetCurrencyConfig(n) end
-)
-CreateESPToggle(Esp, "Item ESP", "EspItems",
-    function(n) return GetItemConfig(n) end
-)
+CreateESPToggle(Esp, "Keycard ESP",              "EspKeycard",  function(n) return KEYCARDS[n] end)
+CreateESPToggle(Esp, "Currency & Blueprint ESP", "EspCurrency", function(n) return GetCurrencyConfig(n) end)
+CreateESPToggle(Esp, "Item ESP",                 "EspItems",    function(n) return GetItemConfig(n) end)
 
 Esp:CreateSection("Monsters")
 
 -- Monster Locker ESP
-local lockerConns, lockerRoomConn = {}, nil
+local lockerConns, lockerActive = {}, false
 Esp:CreateToggle({
     Name = "Monster Locker ESP", CurrentValue = false, Flag = "EspMonsterLocker",
     Callback = function(Value)
+        lockerActive = Value
         local cfg = { label = "⚠ MONSTER LOCKER", fill = Color3.fromRGB(200, 0, 0), outline = Color3.fromRGB(255, 80, 80), textColor = Color3.fromRGB(255, 80, 80), fillTransparency = 0.3 }
         if Value then
-            lockerConns, lockerRoomConn = ScanRooms(
+            lockerConns = ScanRooms(
+                function() return lockerActive end,
                 function(n) return n == "MonsterLocker" and cfg or nil end,
                 function(target, config) AddESP(target, config) end
             )
         else
-            if lockerRoomConn then lockerRoomConn:Disconnect() lockerRoomConn = nil end
-            for _, c in pairs(lockerConns) do c:Disconnect() end
+            for _, c in ipairs(lockerConns) do c:Disconnect() end
             lockerConns = {}
-            for _, room in pairs(Rooms:GetChildren()) do
-                for _, d in pairs(room:GetDescendants()) do
+            for _, room in ipairs(Rooms:GetChildren()) do
+                for _, d in ipairs(room:GetDescendants()) do
                     if d.Name == "MonsterLocker" then pcall(RemoveESP, d) end
                 end
             end
@@ -324,13 +381,15 @@ Esp:CreateToggle({
 })
 
 -- Fake Door ESP
-local fakeDoorConns, fakeDoorRoomConn = {}, nil
+local fakeDoorConns, fakeDoorActive = {}, false
 Esp:CreateToggle({
     Name = "Fake Door ESP", CurrentValue = false, Flag = "EspFakeDoor",
     Callback = function(Value)
+        fakeDoorActive = Value
         local cfg = { label = "✖ FAKE DOOR", fill = Color3.fromRGB(180, 0, 0), outline = RED, textColor = RED, fillTransparency = 0.3 }
         if Value then
-            fakeDoorConns, fakeDoorRoomConn = ScanRooms(
+            fakeDoorConns = ScanRooms(
+                function() return fakeDoorActive end,
                 function(n) return n == "Door" and cfg or nil end,
                 function(target, config)
                     if target.Parent and target.Parent.Name == "TricksterDoor" then
@@ -339,11 +398,10 @@ Esp:CreateToggle({
                 end
             )
         else
-            if fakeDoorRoomConn then fakeDoorRoomConn:Disconnect() fakeDoorRoomConn = nil end
-            for _, c in pairs(fakeDoorConns) do c:Disconnect() end
+            for _, c in ipairs(fakeDoorConns) do c:Disconnect() end
             fakeDoorConns = {}
-            for _, room in pairs(Rooms:GetChildren()) do
-                for _, d in pairs(room:GetDescendants()) do
+            for _, room in ipairs(Rooms:GetChildren()) do
+                for _, d in ipairs(room:GetDescendants()) do
                     if d.Name == "Door" and d.Parent and d.Parent.Name == "TricksterDoor" then
                         pcall(RemoveESP, d)
                     end
@@ -353,18 +411,121 @@ Esp:CreateToggle({
     end
 })
 
+-- Generator ESP
+local generatorConns, generatorActive = {}, false
+Esp:CreateToggle({
+    Name = "Generator ESP", CurrentValue = false, Flag = "EspGenerator",
+    Callback = function(Value)
+        generatorActive = Value
+        local trackedGenerators = {}
+
+        local function getGeneratorCfg(fixedVal)
+            local pct = tonumber(fixedVal) or 0
+            if pct >= 100 then return nil end
+            local r = math.floor(255 * (1 - pct / 100))
+            local g = math.floor(255 * (pct / 100))
+            return {
+                label = "⚙ Generator " .. math.floor(pct) .. "%",
+                fill = Color3.fromRGB(r, g, 0),
+                outline = Color3.fromRGB(255, 200, 0),
+                textColor = WHITE,
+                fillTransparency = 0.3,
+            }
+        end
+
+        local function setupGenerator(gen)
+            if not generatorActive then return end
+            if trackedGenerators[gen] then return end
+            trackedGenerators[gen] = true
+
+            -- Fixed pode ser NumberValue ou IntValue
+            local fixed = gen:FindFirstChild("Fixed")
+            if not fixed then return end
+
+            local proxy = gen:FindFirstChild("ProxyPart") or gen
+            local cfg = getGeneratorCfg(fixed.Value)
+            if cfg then pcall(AddESP, proxy, cfg) end
+
+            -- Atualiza quando Fixed muda
+            table.insert(generatorConns, fixed:GetPropertyChangedSignal("Value"):Connect(function()
+                if not generatorActive then return end
+                pcall(RemoveESP, proxy)
+                local newCfg = getGeneratorCfg(fixed.Value)
+                if newCfg then pcall(AddESP, proxy, newCfg) end
+            end))
+        end
+
+        local function scanRoom(room)
+            for _, d in ipairs(room:GetDescendants()) do
+                if not generatorActive then break end
+                -- PresetGenerator é o nome do objeto gerador
+                if d.Name == "PresetGenerator" or d.Name == "Generator" then
+                    pcall(setupGenerator, d)
+                end
+                -- Também tenta pelo Fixed diretamente
+                if d.Name == "Fixed" and d.Parent then
+                    pcall(setupGenerator, d.Parent)
+                end
+            end
+        end
+
+        if Value then
+            for _, room in ipairs(Rooms:GetChildren()) do
+                task.defer(function() scanRoom(room) end)
+                table.insert(generatorConns, room.DescendantAdded:Connect(function(d)
+                    task.wait(0.2)
+                    if not generatorActive then return end
+                    if d.Name == "PresetGenerator" or d.Name == "Generator" or d.Name == "Fixed" then
+                        pcall(setupGenerator, d.Name == "Fixed" and d.Parent or d)
+                    end
+                end))
+            end
+            table.insert(generatorConns, Rooms.ChildAdded:Connect(function(room)
+                task.wait(0.3)
+                if generatorActive then scanRoom(room) end
+                table.insert(generatorConns, room.DescendantAdded:Connect(function(d)
+                    task.wait(0.2)
+                    if not generatorActive then return end
+                    if d.Name == "PresetGenerator" or d.Name == "Generator" or d.Name == "Fixed" then
+                        pcall(setupGenerator, d.Name == "Fixed" and d.Parent or d)
+                    end
+                end))
+            end))
+        else
+            for _, c in ipairs(generatorConns) do c:Disconnect() end
+            generatorConns = {}
+            trackedGenerators = {}
+            for _, room in ipairs(Rooms:GetChildren()) do
+                for _, d in ipairs(room:GetDescendants()) do
+                    if d.Name == "PresetGenerator" or d.Name == "Generator" then
+                        local proxy = d:FindFirstChild("ProxyPart") or d
+                        pcall(RemoveESP, proxy)
+                    end
+                end
+            end
+        end
+    end
+})
+
 -- Monster ESP
-local monsterEspConns = {}
+local monsterEspConns, monsterEspActive = {}, false
 Esp:CreateToggle({
     Name = "Monster ESP", CurrentValue = false, Flag = "EspMonster",
     Callback = function(Value)
+        monsterEspActive = Value
         local cfg = { fill = Color3.fromRGB(200, 0, 0), outline = Color3.fromRGB(255, 200, 0), textColor = RED, fillTransparency = 0.3 }
         local tracked = {}
+
         local function applyESP(child)
+            if not monsterEspActive then return end
             if tracked[child] then return end
             tracked[child] = true
-            cfg.label = "☠ " .. child.Name
-            pcall(AddESP, child, cfg)
+            local c = {
+                fill = cfg.fill, outline = cfg.outline,
+                textColor = cfg.textColor, fillTransparency = cfg.fillTransparency,
+                label = "☠ " .. child.Name
+            }
+            pcall(AddESP, child, c)
             table.insert(monsterEspConns, child.AncestryChanged:Connect(function()
                 if not child:IsDescendantOf(game) then
                     pcall(RemoveESP, child)
@@ -372,24 +533,26 @@ Esp:CreateToggle({
                 end
             end))
         end
+
         local function scanContainer(container)
-            for _, child in pairs(container:GetChildren()) do
+            for _, child in ipairs(container:GetChildren()) do
                 if MONSTERS[child.Name] then applyESP(child) end
             end
             table.insert(monsterEspConns, container.ChildAdded:Connect(function(child)
-                if MONSTERS[child.Name] then applyESP(child) end
+                if monsterEspActive and MONSTERS[child.Name] then applyESP(child) end
             end))
         end
+
         if Value then
             scanContainer(workspace)
             scanContainer(workspace.GameplayFolder.Monsters)
         else
-            for _, c in pairs(monsterEspConns) do c:Disconnect() end
+            for _, c in ipairs(monsterEspConns) do c:Disconnect() end
             monsterEspConns = {}
-            for _, child in pairs(workspace:GetChildren()) do
+            for _, child in ipairs(workspace:GetChildren()) do
                 if MONSTERS[child.Name] then pcall(RemoveESP, child) end
             end
-            for _, child in pairs(workspace.GameplayFolder.Monsters:GetChildren()) do
+            for _, child in ipairs(workspace.GameplayFolder.Monsters:GetChildren()) do
                 pcall(RemoveESP, child)
             end
         end
@@ -397,27 +560,23 @@ Esp:CreateToggle({
 })
 
 -- Monster Alert
-local monsterAlertConns = {}
+local monsterAlertConns, monsterAlertActive = {}, false
 Esp:CreateToggle({
     Name = "Monster Alert", CurrentValue = false, Flag = "MonsterAlert",
     Callback = function(Value)
-        local function listenContainer(container)
-            table.insert(monsterAlertConns, container.ChildAdded:Connect(function(child)
-                if MONSTERS[child.Name] then
-                    Rayfield:Notify({
-                        Title = "⚠️ Monster Detected!",
-                        Content = child.Name .. " has spawned!",
-                        Duration = 5,
-                        Image = "alert-triangle",
-                    })
-                end
-            end))
-        end
+        monsterAlertActive = Value
         if Value then
+            local function listenContainer(container)
+                table.insert(monsterAlertConns, container.ChildAdded:Connect(function(child)
+                    if monsterAlertActive and MONSTERS[child.Name] then
+                        NotifyOnce(child.Name, "⚠️ Monster Detected!", child.Name .. " has spawned!", 5, "alert-triangle")
+                    end
+                end))
+            end
             listenContainer(workspace)
             listenContainer(workspace.GameplayFolder.Monsters)
         else
-            for _, c in pairs(monsterAlertConns) do c:Disconnect() end
+            for _, c in ipairs(monsterAlertConns) do c:Disconnect() end
             monsterAlertConns = {}
         end
     end
@@ -437,7 +596,7 @@ Esp:CreateToggle({
                 Ambient = L.Ambient, OutdoorAmbient = L.OutdoorAmbient,
             }
             fullbrightEffects = {}
-            for _, e in pairs(L:GetChildren()) do
+            for _, e in ipairs(L:GetChildren()) do
                 if e:IsA("BlurEffect") or e:IsA("ColorCorrectionEffect")
                 or e:IsA("DepthOfFieldEffect") or e:IsA("SunRaysEffect") then
                     fullbrightEffects[e] = e.Enabled
@@ -476,20 +635,29 @@ Auto:CreateToggle({
     Callback = function(Value)
         if not Value then return end
 
-        local platform = nil
-        local dodging  = false
-        local dodgeConns = {}
+        local platform    = nil
+        local dodging     = false
+        local dodgeActive = true
+        local dodgeConns  = {}
+        local heartbeatConn = nil
 
-        local function stopDodge()
-            dodging = false
-            if platform and platform.Parent then
-                platform:Destroy()
-                platform = nil
+        local function cleanupDodge()
+            if heartbeatConn then heartbeatConn:Disconnect() heartbeatConn = nil end
+            if platform and platform.Parent then platform:Destroy() platform = nil end
+        end
+
+        local function freezePlayer(freeze)
+            local hum = GetHumanoid()
+            local root = GetRootPart()
+            if hum then
+                hum.WalkSpeed = freeze and 0 or 16
+                hum.JumpPower = freeze and 0 or 50
             end
+            if root then root.Anchored = freeze end
         end
 
         local function startDodge(monsterName, monsterInstance)
-            if dodging then return end
+            if dodging or not dodgeActive then return end
             dodging = true
 
             local root = GetRootPart()
@@ -497,70 +665,78 @@ Auto:CreateToggle({
 
             local savedCFrame = root.CFrame
 
-            -- Cria plataforma acima
+            -- Freeze
+            freezePlayer(true)
+
+            -- Plataforma 30 studs acima
             platform = Instance.new("Part")
-            platform.Size = Vector3.new(8, 1, 8)
-            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 25, 0))
+            platform.Size = Vector3.new(10, 1, 10)
+            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 30, 0))
             platform.Anchored = true
             platform.CanCollide = true
-            platform.Transparency = 0.4
+            platform.Transparency = 0.3
             platform.Material = Enum.Material.SmoothPlastic
             platform.BrickColor = BrickColor.new("Bright blue")
             platform.Parent = workspace
 
-            root.CFrame = CFrame.new(platform.Position + Vector3.new(0, 3, 0))
+            -- Teleporta e ancora
+            root.Anchored = false
+            root.CFrame = CFrame.new(platform.Position + Vector3.new(0, 4, 0))
+            task.wait(0.05)
+            root.Anchored = true
 
-            Rayfield:Notify({
-                Title = "🛡 Monster Dodge",
-                Content = monsterName .. " spawned! Lifting up until it despawns...",
-                Duration = 5,
-                Image = "shield",
-            })
+            -- Heartbeat mantém player fixo
+            local targetCFrame = CFrame.new(platform.Position + Vector3.new(0, 4, 0))
+            heartbeatConn = RunService.Heartbeat:Connect(function()
+                if not dodging then return end
+                local r = GetRootPart()
+                if r then r.CFrame = targetCFrame end
+            end)
 
-            -- Espera o monstro desaparecer
+            NotifyOnce("dodge_" .. monsterName, "🛡 Monster Dodge", monsterName .. " spawned! Holding until despawn...", 5, "shield")
+
+            -- Aguarda o monstro desaparecer
             local waitConn
             waitConn = monsterInstance.AncestryChanged:Connect(function()
-                if not monsterInstance:IsDescendantOf(workspace) and
-                   not monsterInstance:IsDescendantOf(workspace.GameplayFolder.Monsters) then
-                    waitConn:Disconnect()
+                if monsterInstance:IsDescendantOf(workspace) or
+                   monsterInstance:IsDescendantOf(workspace.GameplayFolder.Monsters) then return end
 
-                    -- Volta ao local original
-                    local newRoot = GetRootPart()
-                    if newRoot then
-                        newRoot.CFrame = savedCFrame
-                    end
+                waitConn:Disconnect()
+                cleanupDodge()
 
-                    stopDodge()
-
-                    Rayfield:Notify({
-                        Title = "🛡 Monster Dodge",
-                        Content = monsterName .. " is gone. Returning to position.",
-                        Duration = 3,
-                        Image = "shield-off",
-                    })
+                local newRoot = GetRootPart()
+                if newRoot then
+                    newRoot.Anchored = false
+                    newRoot.CFrame = savedCFrame
                 end
+
+                freezePlayer(false)
+                dodging = false
+
+                NotifyOnce("dodge_return", "🛡 Monster Dodge", monsterName .. " gone. Returning.", 3, "shield-off")
             end)
         end
 
-        -- Escuta spawn de monstros nos dois containers
         local function listenContainer(container)
-            local conn = container.ChildAdded:Connect(function(child)
-                if Value and MONSTERS[child.Name] then
+            table.insert(dodgeConns, container.ChildAdded:Connect(function(child)
+                if dodgeActive and MONSTERS[child.Name] then
                     startDodge(child.Name, child)
                 end
-            end)
-            table.insert(dodgeConns, conn)
+            end))
         end
 
         listenContainer(workspace)
         listenContainer(workspace.GameplayFolder.Monsters)
 
-        -- Espera toggle desligar para limpar
+        -- Aguarda desligar
         task.spawn(function()
-            while Value do task.wait(0.5) end
-            for _, c in pairs(dodgeConns) do c:Disconnect() end
+            while Value do task.wait(0.3) end
+            dodgeActive = false
+            for _, c in ipairs(dodgeConns) do c:Disconnect() end
             dodgeConns = {}
-            stopDodge()
+            cleanupDodge()
+            freezePlayer(false)
+            dodging = false
         end)
     end
 })
@@ -591,14 +767,15 @@ Anti:CreateToggle({
 
         if Value then
             local function removeInRoom(room)
-                for _, d in pairs(room:GetDescendants()) do
+                for _, d in ipairs(room:GetDescendants()) do
                     if d.Name == "EyefestationSpawn" then pcall(function() d:Destroy() end) end
                 end
             end
-            for _, room in pairs(Rooms:GetChildren()) do removeInRoom(room) end
+            for _, room in ipairs(Rooms:GetChildren()) do
+                task.defer(function() removeInRoom(room) end)
+            end
             conn = Rooms.ChildAdded:Connect(function(room)
-                task.wait(0.1)
-                removeInRoom(room)
+                task.wait(0.1) removeInRoom(room)
                 room.DescendantAdded:Connect(function(d)
                     if d.Name == "EyefestationSpawn" then pcall(function() d:Destroy() end) end
                 end)
@@ -612,12 +789,63 @@ Anti:CreateToggle({
     end
 })
 
-CreateAntiToggle(Anti, "Remove DiVine",       "RemoveDiVine",       function(n) return n == "DiVine" or n == "DiVineRoot" end)
-CreateAntiToggle(Anti, "Remove Searchlights", "RemoveSearchlights", function(n) return n == "Searchlights" end)
+-- Anti Statue (GameplayFolder.Monsters)
+Anti:CreateToggle({
+    Name = "Remove Statue", CurrentValue = false, Flag = "RemoveStatue",
+    Callback = function(Value)
+        local conn = nil
+        local active = Value
+
+        local function removeStatues()
+            local monstersFolder = workspace.GameplayFolder.Monsters
+            for _, d in ipairs(monstersFolder:GetChildren()) do
+                if d.Name == "StatueRoot" then pcall(function() d:Destroy() end) end
+            end
+        end
+
+        if Value then
+            removeStatues()
+            conn = workspace.GameplayFolder.Monsters.ChildAdded:Connect(function(child)
+                if active and child.Name == "StatueRoot" then
+                    pcall(function() child:Destroy() end)
+                end
+            end)
+        else
+            active = false
+            if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
+
+CreateAntiToggle(Anti, "Remove DiVine",         "RemoveDiVine",       function(n) return n == "DiVine" or n == "DiVineRoot" end)
+CreateAntiToggle(Anti, "Remove Searchlights",   "RemoveSearchlights", function(n) return n == "Searchlights" end)
+CreateAntiToggle(Anti, "Remove Monster Locker", "RemoveMonsterLocker",function(n) return n == "MonsterLocker" end)
 
 Anti:CreateSection("Spawns")
-CreateAntiToggle(Anti, "Remove Turrets",   "RemoveTurrets",   function(n) return n == "Turret" end)
-CreateAntiToggle(Anti, "Remove Tripwires", "RemoveTripwires", function(n) return n == "Tripwire" end)
-CreateAntiToggle(Anti, "Remove Landmines", "RemoveLandmines", function(n) return n == "Landmine" end)
+CreateAntiToggle(Anti, "Remove Turrets",   "RemoveTurrets",   function(n) return n == "Turret" or string.match(n, "^TurretSpawn") ~= nil end)
+CreateAntiToggle(Anti, "Remove Tripwires", "RemoveTripwires", function(n) return n == "Tripwire" or n == "TripwireSpawn" end)
+CreateAntiToggle(Anti, "Remove Landmines", "RemoveLandmines", function(n) return n == "Landmine" or n == "LandmineSpawn" end)
+
+Anti:CreateSection("Encounters")
+
+Anti:CreateToggle({
+    Name = "Remove Firewall", CurrentValue = false, Flag = "RemoveFirewall",
+    Callback = function(Value)
+        local conn = nil
+        local active = Value
+        if Value then
+            local fw = workspace:FindFirstChild("Firewall")
+            if fw then fw:Destroy() end
+            conn = workspace.ChildAdded:Connect(function(child)
+                if active and child.Name == "Firewall" then
+                    pcall(function() child:Destroy() end)
+                end
+            end)
+        else
+            active = false
+            if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
 
 Rayfield:LoadConfiguration()
