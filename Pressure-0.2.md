@@ -1,11 +1,43 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Pressure 0.1",
+    Name = "Pressure 0.2",
     Icon = 0,
-    LoadingTitle = "Pressure 0.1",
-    LoadingSubtitle = "by Normalplayer",
-    Theme = "Default",
+    LoadingTitle = "Pressure 0.2",
+    LoadingSubtitle = "by normalplayer",
+    Theme = {
+        TextColor = Color3.fromRGB(200, 225, 255),
+        Background = Color3.fromRGB(10, 18, 35),
+        Topbar = Color3.fromRGB(15, 25, 50),
+        Shadow = Color3.fromRGB(5, 10, 20),
+        NotificationBackground = Color3.fromRGB(12, 22, 45),
+        NotificationActionsBackground = Color3.fromRGB(30, 60, 120),
+        TabBackground = Color3.fromRGB(20, 35, 70),
+        TabStroke = Color3.fromRGB(30, 55, 110),
+        TabBackgroundSelected = Color3.fromRGB(40, 90, 180),
+        TabTextColor = Color3.fromRGB(150, 190, 255),
+        SelectedTabTextColor = Color3.fromRGB(220, 235, 255),
+        ElementBackground = Color3.fromRGB(15, 28, 58),
+        ElementBackgroundHover = Color3.fromRGB(20, 38, 78),
+        SecondaryElementBackground = Color3.fromRGB(10, 18, 40),
+        ElementStroke = Color3.fromRGB(35, 65, 130),
+        SecondaryElementStroke = Color3.fromRGB(25, 48, 100),
+        SliderBackground = Color3.fromRGB(30, 80, 170),
+        SliderProgress = Color3.fromRGB(50, 120, 220),
+        SliderStroke = Color3.fromRGB(70, 150, 255),
+        ToggleBackground = Color3.fromRGB(15, 28, 58),
+        ToggleEnabled = Color3.fromRGB(40, 110, 220),
+        ToggleDisabled = Color3.fromRGB(40, 55, 90),
+        ToggleEnabledStroke = Color3.fromRGB(60, 140, 255),
+        ToggleDisabledStroke = Color3.fromRGB(50, 70, 120),
+        ToggleEnabledOuterStroke = Color3.fromRGB(35, 90, 180),
+        ToggleDisabledOuterStroke = Color3.fromRGB(25, 40, 80),
+        DropdownSelected = Color3.fromRGB(20, 40, 85),
+        DropdownUnselected = Color3.fromRGB(15, 28, 58),
+        InputBackground = Color3.fromRGB(15, 28, 58),
+        InputStroke = Color3.fromRGB(40, 75, 150),
+        PlaceholderColor = Color3.fromRGB(100, 140, 200),
+    },
     ToggleUIKeybind = "K",
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
@@ -13,13 +45,22 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
-local Esp   = Window:CreateTab("Visuals", "eye")
-local Auto  = Window:CreateTab("Automations", "zap")
-local Anti  = Window:CreateTab("Antis", "shield")
+task.wait(2)
+Rayfield:Notify({
+    Title = "Pressure 0.2",
+    Content = "Please report any bugs in the comments of ScriptBlox, or leave a suggestion!",
+    Duration = 8,
+    Image = "message-circle",
+})
 
-local WHITE = Color3.fromRGB(255, 255, 255)
-local RED   = Color3.fromRGB(255, 0, 0)
-local Rooms = workspace.GameplayFolder.Rooms
+local Esp    = Window:CreateTab("Visuals", "eye")
+local Auto   = Window:CreateTab("Automations", "zap")
+local Anti   = Window:CreateTab("Antis", "shield")
+
+local WHITE  = Color3.fromRGB(255, 255, 255)
+local RED    = Color3.fromRGB(255, 0, 0)
+local Rooms  = workspace.GameplayFolder.Rooms
+local Player = game:GetService("Players").LocalPlayer
 
 -- ================================================
 -- CONFIGS
@@ -32,7 +73,6 @@ local KEYCARDS = {
     PasswordPaper = { label = "Password",      fill = Color3.fromRGB(0,   200, 80),  outline = Color3.fromRGB(100, 255, 150) },
 }
 
--- Itens com variantes de nome (ex: BigFlashBeacon, FlashBeaconHighGrade)
 local ITEM_PATTERNS = {
     { pattern = "Lantern",      label = "Lantern",       fill = Color3.fromRGB(255, 200, 0),   outline = Color3.fromRGB(255, 230, 100) },
     { pattern = "Flashlight",   label = "Flashlight",    fill = Color3.fromRGB(200, 200, 255), outline = Color3.fromRGB(255, 255, 255) },
@@ -42,13 +82,13 @@ local ITEM_PATTERNS = {
     { pattern = "Defib",        label = "Defib",         fill = Color3.fromRGB(255, 0,   100), outline = Color3.fromRGB(255, 100, 180) },
     { pattern = "FlashBeacon",  label = "Flash Beacon",  fill = Color3.fromRGB(255, 255, 50),  outline = Color3.fromRGB(255, 255, 150) },
     { pattern = "Scanner",      label = "Scanner",       fill = Color3.fromRGB(0,   255, 200), outline = Color3.fromRGB(100, 255, 230) },
-    { pattern = "Notebook",     label = "Notebook",      fill = Color3.fromRGB(200, 150, 50),  outline = Color3.fromRGB(230, 190, 120) },
     { pattern = "^Book$",       label = "Book",          fill = Color3.fromRGB(180, 120, 40),  outline = Color3.fromRGB(220, 170, 100) },
     { pattern = "CodeBreacher", label = "Code Breacher", fill = Color3.fromRGB(0,   200, 255), outline = Color3.fromRGB(100, 230, 255) },
     { pattern = "Gummylight",   label = "Gummylight",    fill = Color3.fromRGB(255, 100, 200), outline = Color3.fromRGB(255, 180, 230) },
     { pattern = "WindupLight",  label = "Windup Light",  fill = Color3.fromRGB(255, 180, 50),  outline = Color3.fromRGB(255, 210, 120) },
     { pattern = "SPRINT",       label = "SPRINT",        fill = Color3.fromRGB(50,  255, 100), outline = Color3.fromRGB(150, 255, 180) },
     { pattern = "ToyRemote",    label = "Toy Remote",    fill = Color3.fromRGB(100, 100, 255), outline = Color3.fromRGB(180, 180, 255) },
+    { pattern = "Battery",      label = "Battery",       fill = Color3.fromRGB(255, 230, 0),   outline = Color3.fromRGB(255, 245, 100) },
 }
 
 local MONSTERS = {
@@ -106,25 +146,9 @@ local function GetCurrencyConfig(name)
     return nil
 end
 
-local function IsCurrencyOrBlueprint(name)
-    return GetCurrencyConfig(name) ~= nil
-end
-
--- Cache de proxies para Currency Aura
-local currencyProxyCache = {}
-
-local function RebuildCurrencyCache()
-    currencyProxyCache = {}
-    for _, room in pairs(Rooms:GetChildren()) do
-        for _, d in pairs(room:GetDescendants()) do
-            if IsCurrencyOrBlueprint(d.Name) then
-                local proxy = d:FindFirstChild("ProxyPart")
-                if proxy then
-                    currencyProxyCache[proxy] = true
-                end
-            end
-        end
-    end
+local function GetRootPart()
+    local char = Player.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
 end
 
 -- ================================================
@@ -174,7 +198,6 @@ local function RemoveESP(part)
     if b then b:Destroy() end
 end
 
--- Função genérica de scan por rooms
 local function ScanRooms(matchFn, onFound)
     local connections = {}
     local roomConn = nil
@@ -188,25 +211,20 @@ local function ScanRooms(matchFn, onFound)
     end
 
     local function scanRoom(room)
-        for _, d in pairs(room:GetDescendants()) do
-            pcall(scanDesc, d)
-        end
+        for _, d in pairs(room:GetDescendants()) do pcall(scanDesc, d) end
     end
 
     for _, room in pairs(Rooms:GetChildren()) do
         scanRoom(room)
         table.insert(connections, room.DescendantAdded:Connect(function(d)
-            task.wait(0.1)
-            pcall(scanDesc, d)
+            task.wait(0.1) pcall(scanDesc, d)
         end))
     end
 
     roomConn = Rooms.ChildAdded:Connect(function(room)
-        task.wait(0.5)
-        scanRoom(room)
+        task.wait(0.5) scanRoom(room)
         table.insert(connections, room.DescendantAdded:Connect(function(d)
-            task.wait(0.1)
-            pcall(scanDesc, d)
+            task.wait(0.1) pcall(scanDesc, d)
         end))
     end)
 
@@ -216,7 +234,6 @@ end
 local function CreateESPToggle(tab, name, flag, matchFn)
     local connections = {}
     local roomConn = nil
-
     tab:CreateToggle({
         Name = name, CurrentValue = false, Flag = flag,
         Callback = function(Value)
@@ -238,7 +255,6 @@ local function CreateESPToggle(tab, name, flag, matchFn)
     })
 end
 
--- Anti genérico
 local function CreateAntiToggle(tab, name, flag, matchFn)
     local conn = nil
     tab:CreateToggle({
@@ -254,7 +270,6 @@ local function CreateAntiToggle(tab, name, flag, matchFn)
                 conn = Rooms.ChildAdded:Connect(function(room)
                     task.wait(0.1)
                     removeInRoom(room)
-                    -- Detecta descendants novos dentro da sala
                     room.DescendantAdded:Connect(function(d)
                         if matchFn(d.Name) then pcall(function() d:Destroy() end) end
                     end)
@@ -275,11 +290,9 @@ Esp:CreateSection("Items")
 CreateESPToggle(Esp, "Keycard ESP", "EspKeycard",
     function(n) return KEYCARDS[n] end
 )
-
 CreateESPToggle(Esp, "Currency & Blueprint ESP", "EspCurrency",
     function(n) return GetCurrencyConfig(n) end
 )
-
 CreateESPToggle(Esp, "Item ESP", "EspItems",
     function(n) return GetItemConfig(n) end
 )
@@ -412,7 +425,6 @@ Esp:CreateToggle({
 
 Esp:CreateSection("World")
 
--- Fullbright
 local originalLighting, fullbrightEffects = {}, {}
 Esp:CreateToggle({
     Name = "Fullbright", CurrentValue = false, Flag = "Fullbright",
@@ -457,44 +469,99 @@ Esp:CreateToggle({
 -- AUTOMATIONS
 -- ================================================
 
-Auto:CreateSection("Aura")
+Auto:CreateSection("Safety")
 
 Auto:CreateToggle({
-    Name = "Currency Aura", CurrentValue = false, Flag = "CurrencyAura",
+    Name = "Monster Dodge", CurrentValue = false, Flag = "MonsterDodge",
     Callback = function(Value)
-        if Value then
-            -- Constrói cache inicial
-            RebuildCurrencyCache()
+        if not Value then return end
 
-            -- Listener para novos itens
-            local newItemConn = Rooms.ChildAdded:Connect(function(room)
-                task.wait(0.5)
-                room.DescendantAdded:Connect(function(d)
-                    if IsCurrencyOrBlueprint(d.Name) then
-                        local proxy = d:FindFirstChild("ProxyPart")
-                        if proxy then currencyProxyCache[proxy] = true end
-                    end
-                end)
-            end)
+        local platform = nil
+        local dodging  = false
+        local dodgeConns = {}
 
-            task.spawn(function()
-                while Value do
-                    for proxy in pairs(currencyProxyCache) do
-                        if proxy and proxy.Parent then
-                            local prompt = proxy:FindFirstChildOfClass("ProximityPrompt")
-                            if prompt and prompt.Enabled then
-                                pcall(fireproximityprompt, prompt)
-                            end
-                        else
-                            currencyProxyCache[proxy] = nil
-                        end
+        local function stopDodge()
+            dodging = false
+            if platform and platform.Parent then
+                platform:Destroy()
+                platform = nil
+            end
+        end
+
+        local function startDodge(monsterName, monsterInstance)
+            if dodging then return end
+            dodging = true
+
+            local root = GetRootPart()
+            if not root then dodging = false return end
+
+            local savedCFrame = root.CFrame
+
+            -- Cria plataforma acima
+            platform = Instance.new("Part")
+            platform.Size = Vector3.new(8, 1, 8)
+            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 25, 0))
+            platform.Anchored = true
+            platform.CanCollide = true
+            platform.Transparency = 0.4
+            platform.Material = Enum.Material.SmoothPlastic
+            platform.BrickColor = BrickColor.new("Bright blue")
+            platform.Parent = workspace
+
+            root.CFrame = CFrame.new(platform.Position + Vector3.new(0, 3, 0))
+
+            Rayfield:Notify({
+                Title = "🛡 Monster Dodge",
+                Content = monsterName .. " spawned! Lifting up until it despawns...",
+                Duration = 5,
+                Image = "shield",
+            })
+
+            -- Espera o monstro desaparecer
+            local waitConn
+            waitConn = monsterInstance.AncestryChanged:Connect(function()
+                if not monsterInstance:IsDescendantOf(workspace) and
+                   not monsterInstance:IsDescendantOf(workspace.GameplayFolder.Monsters) then
+                    waitConn:Disconnect()
+
+                    -- Volta ao local original
+                    local newRoot = GetRootPart()
+                    if newRoot then
+                        newRoot.CFrame = savedCFrame
                     end
-                    task.wait(0.5)
+
+                    stopDodge()
+
+                    Rayfield:Notify({
+                        Title = "🛡 Monster Dodge",
+                        Content = monsterName .. " is gone. Returning to position.",
+                        Duration = 3,
+                        Image = "shield-off",
+                    })
                 end
-                if newItemConn then newItemConn:Disconnect() end
-                currencyProxyCache = {}
             end)
         end
+
+        -- Escuta spawn de monstros nos dois containers
+        local function listenContainer(container)
+            local conn = container.ChildAdded:Connect(function(child)
+                if Value and MONSTERS[child.Name] then
+                    startDodge(child.Name, child)
+                end
+            end)
+            table.insert(dodgeConns, conn)
+        end
+
+        listenContainer(workspace)
+        listenContainer(workspace.GameplayFolder.Monsters)
+
+        -- Espera toggle desligar para limpar
+        task.spawn(function()
+            while Value do task.wait(0.5) end
+            for _, c in pairs(dodgeConns) do c:Disconnect() end
+            dodgeConns = {}
+            stopDodge()
+        end)
     end
 })
 
@@ -504,7 +571,6 @@ Auto:CreateToggle({
 
 Anti:CreateSection("Monsters")
 
--- Remove Eyefestation + Mute Song
 Anti:CreateToggle({
     Name = "Remove Eyefestation", CurrentValue = false, Flag = "RemoveEyefestation",
     Callback = function(Value)
@@ -513,7 +579,7 @@ Anti:CreateToggle({
 
         local function muteSong(mute)
             pcall(function()
-                local song = game:GetService("Players").LocalPlayer.PlayerGui.Main.Client.MainClient.LocalEntities.Eyefestation.Song
+                local song = Player.PlayerGui.Main.Client.MainClient.LocalEntities.Eyefestation.Song
                 song.Volume = mute and 0 or 1
                 if mute and not muteConn then
                     muteConn = song:GetPropertyChangedSignal("Volume"):Connect(function()
@@ -552,6 +618,6 @@ CreateAntiToggle(Anti, "Remove Searchlights", "RemoveSearchlights", function(n) 
 Anti:CreateSection("Spawns")
 CreateAntiToggle(Anti, "Remove Turrets",   "RemoveTurrets",   function(n) return n == "Turret" end)
 CreateAntiToggle(Anti, "Remove Tripwires", "RemoveTripwires", function(n) return n == "Tripwire" end)
-CreateAntiToggle(Anti, "Remove Landmines", "RemoveLandmines", function(n) return n == "Scorchmark" end)
+CreateAntiToggle(Anti, "Remove Landmines", "RemoveLandmines", function(n) return n == "Landmine" end)
 
 Rayfield:LoadConfiguration()
