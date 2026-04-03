@@ -61,7 +61,7 @@ Rayfield:Notify({
 local Updates = Window:CreateTab("Updates", "file-text")
 Updates:CreateParagraph({
     Title = "Version 0.3",
-    Content = "- Fixed Monster Dodge (now lifts 30 studs above, suggestion of: HCZyu)\n- Fixed Generator ESP\n- Fixed toggles not properly disabling\n- Added Anti-Statue\n- Added Generator ESP\n- Improved performance (less lag when opening doors)\n- Added Changelog window\n- Fixed Pandemonium notification spam\n- Fixed Anti toggles not working in every room"
+Content = "- Fixed Keycard ESP not disabling properly\n- Monster Dodge now lifts 50 studs above\n- Monster Dodge now has 30s timeout (auto-returns)\n- Fixed toggles not properly disabling\n- Added Anti-Statue\n- Added Generator ESP\n- Improved performance\n- Fixed Pandemonium notification spam\n- Fixed Anti toggles not working in every room"
 })
 
 local Esp    = Window:CreateTab("Visuals", "eye")
@@ -77,6 +77,9 @@ local RunService = game:GetService("RunService")
 -- ================================================
 -- CONFIGS
 -- ================================================
+
+
+local espTargets = {} 
 
 local KEYCARDS = {
     NormalKeyCard = { label = "Keycard",       fill = Color3.fromRGB(255, 50,  50),  outline = Color3.fromRGB(255, 150, 150) },
@@ -274,27 +277,30 @@ end
 local function CreateESPToggle(tab, name, flag, matchFn)
     local connections = {}
     local active = false
+    local targets = {} -- rastreia targets para remoção correta
 
     tab:CreateToggle({
         Name = name, CurrentValue = false, Flag = flag,
         Callback = function(Value)
             active = Value
             if Value then
+                targets = {}
                 connections = ScanRooms(
                     function() return active end,
                     matchFn,
-                    function(target, config) AddESP(target, config) end
+                    function(target, config)
+                        AddESP(target, config)
+                        table.insert(targets, target)
+                    end
                 )
             else
                 for _, c in ipairs(connections) do c:Disconnect() end
                 connections = {}
-                task.defer(function()
-                    for _, room in ipairs(Rooms:GetChildren()) do
-                        for _, d in ipairs(room:GetDescendants()) do
-                            pcall(RemoveESP, d:FindFirstChild("ProxyPart") or d)
-                        end
-                    end
-                end)
+                -- Remove ESP apenas dos targets rastreados
+                for _, target in ipairs(targets) do
+                    pcall(RemoveESP, target)
+                end
+                targets = {}
             end
         end
     })
@@ -635,10 +641,10 @@ Auto:CreateToggle({
     Callback = function(Value)
         if not Value then return end
 
-        local platform    = nil
-        local dodging     = false
-        local dodgeActive = true
-        local dodgeConns  = {}
+        local platform      = nil
+        local dodging       = false
+        local dodgeActive   = true
+        local dodgeConns    = {}
         local heartbeatConn = nil
 
         local function cleanupDodge()
@@ -647,13 +653,25 @@ Auto:CreateToggle({
         end
 
         local function freezePlayer(freeze)
-            local hum = GetHumanoid()
+            local hum  = GetHumanoid()
             local root = GetRootPart()
             if hum then
                 hum.WalkSpeed = freeze and 0 or 16
                 hum.JumpPower = freeze and 0 or 50
             end
             if root then root.Anchored = freeze end
+        end
+
+        local function returnPlayer(savedCFrame, monsterName)
+            cleanupDodge()
+            local newRoot = GetRootPart()
+            if newRoot then
+                newRoot.Anchored = false
+                newRoot.CFrame = savedCFrame
+            end
+            freezePlayer(false)
+            dodging = false
+            NotifyOnce("dodge_return", "🛡 Monster Dodge", monsterName .. " gone or timeout. Returning.", 3, "shield-off")
         end
 
         local function startDodge(monsterName, monsterInstance)
@@ -665,13 +683,11 @@ Auto:CreateToggle({
 
             local savedCFrame = root.CFrame
 
-            -- Freeze
             freezePlayer(true)
 
-            -- Plataforma 30 studs acima
             platform = Instance.new("Part")
             platform.Size = Vector3.new(10, 1, 10)
-            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 30, 0))
+            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 50, 0))
             platform.Anchored = true
             platform.CanCollide = true
             platform.Transparency = 0.3
@@ -679,13 +695,11 @@ Auto:CreateToggle({
             platform.BrickColor = BrickColor.new("Bright blue")
             platform.Parent = workspace
 
-            -- Teleporta e ancora
             root.Anchored = false
             root.CFrame = CFrame.new(platform.Position + Vector3.new(0, 4, 0))
             task.wait(0.05)
             root.Anchored = true
 
-            -- Heartbeat mantém player fixo
             local targetCFrame = CFrame.new(platform.Position + Vector3.new(0, 4, 0))
             heartbeatConn = RunService.Heartbeat:Connect(function()
                 if not dodging then return end
@@ -693,27 +707,28 @@ Auto:CreateToggle({
                 if r then r.CFrame = targetCFrame end
             end)
 
-            NotifyOnce("dodge_" .. monsterName, "🛡 Monster Dodge", monsterName .. " spawned! Holding until despawn...", 5, "shield")
+            NotifyOnce("dodge_" .. monsterName, "🛡 Monster Dodge", monsterName .. " spawned! Holding up to 30s...", 5, "shield")
 
-            -- Aguarda o monstro desaparecer
+            local returned = false
+
+            -- Timeout de 20 segundos
+            task.delay(30, function()
+                if dodging and not returned then
+                    returned = true
+                    returnPlayer(savedCFrame, monsterName .. " (timeout)")
+                end
+            end)
+
+            -- Aguarda monstro desaparecer
             local waitConn
             waitConn = monsterInstance.AncestryChanged:Connect(function()
                 if monsterInstance:IsDescendantOf(workspace) or
                    monsterInstance:IsDescendantOf(workspace.GameplayFolder.Monsters) then return end
-
                 waitConn:Disconnect()
-                cleanupDodge()
-
-                local newRoot = GetRootPart()
-                if newRoot then
-                    newRoot.Anchored = false
-                    newRoot.CFrame = savedCFrame
+                if not returned then
+                    returned = true
+                    returnPlayer(savedCFrame, monsterName)
                 end
-
-                freezePlayer(false)
-                dodging = false
-
-                NotifyOnce("dodge_return", "🛡 Monster Dodge", monsterName .. " gone. Returning.", 3, "shield-off")
             end)
         end
 
@@ -728,7 +743,6 @@ Auto:CreateToggle({
         listenContainer(workspace)
         listenContainer(workspace.GameplayFolder.Monsters)
 
-        -- Aguarda desligar
         task.spawn(function()
             while Value do task.wait(0.3) end
             dodgeActive = false
