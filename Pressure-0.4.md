@@ -1,14 +1,10 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- ================================================
--- MAIN WINDOW
--- ================================================
-
 local Window = Rayfield:CreateWindow({
-    Name = "Pressure 0.3",
+    Name = "Pressure 0.4",
     Icon = 0,
-    LoadingTitle = "Pressure 0.3",
-    LoadingSubtitle = "by normalplayer",
+    LoadingTitle = "Pressure 0.4",
+    LoadingSubtitle = "by Normalplayer",
     Theme = {
         TextColor = Color3.fromRGB(200, 225, 255),
         Background = Color3.fromRGB(10, 18, 35),
@@ -51,17 +47,21 @@ local Window = Rayfield:CreateWindow({
 
 task.wait(2)
 Rayfield:Notify({
-    Title = "Pressure 0.3",
+    Title = "Pressure 0.4",
     Content = "Please report any bugs in the comments of ScriptBlox, or leave a suggestion!",
     Duration = 8,
     Image = "message-circle",
 })
 
-
 local Updates = Window:CreateTab("Updates", "file-text")
 Updates:CreateParagraph({
-    Title = "Version 0.3",
-Content = "- Fixed Keycard ESP not disabling properly\n- Monster Dodge now lifts 50 studs above\n- Monster Dodge now has 30s timeout (auto-returns)\n- Fixed toggles not properly disabling\n- Added Anti-Statue\n- Added Generator ESP\n- Improved performance\n- Fixed Pandemonium notification spam\n- Fixed Anti toggles not working in every room"
+    Title = "Version 0.4 mini update",
+    Content = "- Monster Dodge now lifts 80 studs above (monsters can no longer reach)\n- Monster Dodge timeout increased to 40 seconds\n- Fixed Monster Dodge not stopping when toggle is disabled\n- Added NeoStyk ESP\n- Added Anti WallDweller"
+})
+Updates:CreateDivider()
+Updates:CreateParagraph({
+      Title = "Version 0.3 Fix update",
+    Content = "- Fixed Monster Dodge (now lifts 50 studs above)\n- Fixed Generator ESP\n- Fixed toggles not properly disabling\n- Added Anti-Statue\n- Added Generator ESP\n- Improved performance\n- Added Changelog\n- Fixed Pandemonium notification spam\n- Fixed Anti toggles not working in every room"
 })
 
 local Esp    = Window:CreateTab("Visuals", "eye")
@@ -77,9 +77,6 @@ local RunService = game:GetService("RunService")
 -- ================================================
 -- CONFIGS
 -- ================================================
-
-
-local espTargets = {} 
 
 local KEYCARDS = {
     NormalKeyCard = { label = "Keycard",       fill = Color3.fromRGB(255, 50,  50),  outline = Color3.fromRGB(255, 150, 150) },
@@ -104,6 +101,8 @@ local ITEM_PATTERNS = {
     { pattern = "SPRINT",       label = "SPRINT",        fill = Color3.fromRGB(50,  255, 100), outline = Color3.fromRGB(150, 255, 180) },
     { pattern = "ToyRemote",    label = "Toy Remote",    fill = Color3.fromRGB(100, 100, 255), outline = Color3.fromRGB(180, 180, 255) },
     { pattern = "Battery",      label = "Battery",       fill = Color3.fromRGB(255, 230, 0),   outline = Color3.fromRGB(255, 245, 100) },
+    { pattern = "Neostyk",      label = "NeoStyk",       fill = Color3.fromRGB(0,   255, 150), outline = Color3.fromRGB(100, 255, 200) },
+    { pattern = "NeoStyk",      label = "NeoStyk",       fill = Color3.fromRGB(0,   255, 150), outline = Color3.fromRGB(100, 255, 200) },
 }
 
 local MONSTERS = {
@@ -118,6 +117,8 @@ local MONSTERS = {
     Blitz = true, Squiddles = true, NaviAI = true, Void = true,
     RottenCoral = true, Searchlights = true, DefenseSystem = true,
     Froger = true, Chainsmoker = true, Pinkie = true,
+    -- Wall Dweller variants
+    WallDweller = true, MeatWallDweller = true, RottenWallDweller = true,
 }
 
 local CURRENCY_PATTERNS = {
@@ -171,7 +172,6 @@ local function GetHumanoid()
     return char and char:FindFirstChildOfClass("Humanoid")
 end
 
--- Debounce de notificações
 local lastNotify = {}
 local function NotifyOnce(key, title, content, duration, image)
     if lastNotify[key] and (tick() - lastNotify[key]) < 8 then return end
@@ -228,7 +228,6 @@ local function RemoveESP(part)
     if b then b:Destroy() end
 end
 
--- ScanRooms otimizado com scanned cache para evitar lag
 local function ScanRooms(enabled, matchFn, onFound)
     local connections = {}
     local scanned = {}
@@ -237,7 +236,6 @@ local function ScanRooms(enabled, matchFn, onFound)
         if scanned[d] then return end
         scanned[d] = true
         if not d.Parent then return end
-        -- Só processa folhas ou objetos relevantes
         local config = matchFn(d.Name)
         if config then
             local target = d:FindFirstChild("ProxyPart") or d
@@ -277,7 +275,7 @@ end
 local function CreateESPToggle(tab, name, flag, matchFn)
     local connections = {}
     local active = false
-    local targets = {} -- rastreia targets para remoção correta
+    local targets = {}
 
     tab:CreateToggle({
         Name = name, CurrentValue = false, Flag = flag,
@@ -296,7 +294,6 @@ local function CreateESPToggle(tab, name, flag, matchFn)
             else
                 for _, c in ipairs(connections) do c:Disconnect() end
                 connections = {}
-                -- Remove ESP apenas dos targets rastreados
                 for _, target in ipairs(targets) do
                     pcall(RemoveESP, target)
                 end
@@ -306,7 +303,6 @@ local function CreateESPToggle(tab, name, flag, matchFn)
     })
 end
 
--- Anti genérico otimizado
 local function CreateAntiToggle(tab, name, flag, matchFn)
     local conns = {}
     local active = false
@@ -443,16 +439,11 @@ Esp:CreateToggle({
             if not generatorActive then return end
             if trackedGenerators[gen] then return end
             trackedGenerators[gen] = true
-
-            -- Fixed pode ser NumberValue ou IntValue
             local fixed = gen:FindFirstChild("Fixed")
             if not fixed then return end
-
             local proxy = gen:FindFirstChild("ProxyPart") or gen
             local cfg = getGeneratorCfg(fixed.Value)
             if cfg then pcall(AddESP, proxy, cfg) end
-
-            -- Atualiza quando Fixed muda
             table.insert(generatorConns, fixed:GetPropertyChangedSignal("Value"):Connect(function()
                 if not generatorActive then return end
                 pcall(RemoveESP, proxy)
@@ -464,11 +455,9 @@ Esp:CreateToggle({
         local function scanRoom(room)
             for _, d in ipairs(room:GetDescendants()) do
                 if not generatorActive then break end
-                -- PresetGenerator é o nome do objeto gerador
                 if d.Name == "PresetGenerator" or d.Name == "Generator" then
                     pcall(setupGenerator, d)
                 end
-                -- Também tenta pelo Fixed diretamente
                 if d.Name == "Fixed" and d.Parent then
                     pcall(setupGenerator, d.Parent)
                 end
@@ -636,14 +625,18 @@ Esp:CreateToggle({
 
 Auto:CreateSection("Safety")
 
+-- Monster Dodge — corrigido para parar quando toggle é desligado
+local dodgeActive = false
+
 Auto:CreateToggle({
     Name = "Monster Dodge", CurrentValue = false, Flag = "MonsterDodge",
     Callback = function(Value)
+        dodgeActive = Value
+
         if not Value then return end
 
         local platform      = nil
         local dodging       = false
-        local dodgeActive   = true
         local dodgeConns    = {}
         local heartbeatConn = nil
 
@@ -662,7 +655,7 @@ Auto:CreateToggle({
             if root then root.Anchored = freeze end
         end
 
-        local function returnPlayer(savedCFrame, monsterName)
+        local function returnPlayer(savedCFrame, reason)
             cleanupDodge()
             local newRoot = GetRootPart()
             if newRoot then
@@ -671,7 +664,7 @@ Auto:CreateToggle({
             end
             freezePlayer(false)
             dodging = false
-            NotifyOnce("dodge_return", "🛡 Monster Dodge", monsterName .. " gone or timeout. Returning.", 3, "shield-off")
+            NotifyOnce("dodge_return", "🛡 Monster Dodge", reason .. " Returning.", 3, "shield-off")
         end
 
         local function startDodge(monsterName, monsterInstance)
@@ -685,9 +678,10 @@ Auto:CreateToggle({
 
             freezePlayer(true)
 
+            -- 80 studs acima
             platform = Instance.new("Part")
             platform.Size = Vector3.new(10, 1, 10)
-            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 50, 0))
+            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 80, 0))
             platform.Anchored = true
             platform.CanCollide = true
             platform.Transparency = 0.3
@@ -707,15 +701,15 @@ Auto:CreateToggle({
                 if r then r.CFrame = targetCFrame end
             end)
 
-            NotifyOnce("dodge_" .. monsterName, "🛡 Monster Dodge", monsterName .. " spawned! Holding up to 30s...", 5, "shield")
+            NotifyOnce("dodge_" .. monsterName, "🛡 Monster Dodge", monsterName .. " spawned! Holding for up to 40s...", 5, "shield")
 
             local returned = false
 
-            -- Timeout de 20 segundos
-            task.delay(30, function()
+            -- Timeout de 40 segundos
+            task.delay(40, function()
                 if dodging and not returned then
                     returned = true
-                    returnPlayer(savedCFrame, monsterName .. " (timeout)")
+                    returnPlayer(savedCFrame, monsterName .. " timeout.")
                 end
             end)
 
@@ -727,7 +721,7 @@ Auto:CreateToggle({
                 waitConn:Disconnect()
                 if not returned then
                     returned = true
-                    returnPlayer(savedCFrame, monsterName)
+                    returnPlayer(savedCFrame, monsterName .. " gone.")
                 end
             end)
         end
@@ -743,9 +737,10 @@ Auto:CreateToggle({
         listenContainer(workspace)
         listenContainer(workspace.GameplayFolder.Monsters)
 
+        -- Monitora desligamento do toggle
         task.spawn(function()
-            while Value do task.wait(0.3) end
-            dodgeActive = false
+            while dodgeActive do task.wait(0.3) end
+            -- Toggle foi desligado
             for _, c in ipairs(dodgeConns) do c:Disconnect() end
             dodgeConns = {}
             cleanupDodge()
@@ -803,22 +798,48 @@ Anti:CreateToggle({
     end
 })
 
--- Anti Statue (GameplayFolder.Monsters)
+-- Anti WallDweller — remove do workspace diretamente
+Anti:CreateToggle({
+    Name = "Remove WallDweller", CurrentValue = false, Flag = "RemoveWallDweller",
+    Callback = function(Value)
+        local conn = nil
+        local active = Value
+        local WALLDWELLER_NAMES = {
+            WallDweller = true,
+            MeatWallDweller = true,
+            RottenWallDweller = true,
+            WallDwellers = true,
+        }
+
+        if Value then
+            -- Remove existentes no workspace
+            for _, child in ipairs(workspace:GetChildren()) do
+                if WALLDWELLER_NAMES[child.Name] then
+                    pcall(function() child:Destroy() end)
+                end
+            end
+            -- Remove novos
+            conn = workspace.ChildAdded:Connect(function(child)
+                if active and WALLDWELLER_NAMES[child.Name] then
+                    pcall(function() child:Destroy() end)
+                end
+            end)
+        else
+            active = false
+            if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
+
 Anti:CreateToggle({
     Name = "Remove Statue", CurrentValue = false, Flag = "RemoveStatue",
     Callback = function(Value)
         local conn = nil
         local active = Value
-
-        local function removeStatues()
-            local monstersFolder = workspace.GameplayFolder.Monsters
-            for _, d in ipairs(monstersFolder:GetChildren()) do
+        if Value then
+            for _, d in ipairs(workspace.GameplayFolder.Monsters:GetChildren()) do
                 if d.Name == "StatueRoot" then pcall(function() d:Destroy() end) end
             end
-        end
-
-        if Value then
-            removeStatues()
             conn = workspace.GameplayFolder.Monsters.ChildAdded:Connect(function(child)
                 if active and child.Name == "StatueRoot" then
                     pcall(function() child:Destroy() end)
