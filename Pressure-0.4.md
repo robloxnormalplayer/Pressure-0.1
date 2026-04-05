@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Pressure 0.4",
+    Name = "Pressure 0.45",
     Icon = 0,
-    LoadingTitle = "Pressure 0.4",
+    LoadingTitle = "Pressure 0.45",
     LoadingSubtitle = "by Normalplayer",
     Theme = {
         TextColor = Color3.fromRGB(200, 225, 255),
@@ -47,7 +47,7 @@ local Window = Rayfield:CreateWindow({
 
 task.wait(2)
 Rayfield:Notify({
-    Title = "Pressure 0.4",
+    Title = "Pressure 0.45",
     Content = "Please report any bugs in the comments of ScriptBlox, or leave a suggestion!",
     Duration = 8,
     Image = "message-circle",
@@ -55,12 +55,17 @@ Rayfield:Notify({
 
 local Updates = Window:CreateTab("Updates", "file-text")
 Updates:CreateParagraph({
-    Title = "Version 0.4 mini update",
-    Content = "- Monster Dodge now lifts 80 studs above (monsters can no longer reach)\n- Monster Dodge timeout increased to 40 seconds\n- Fixed Monster Dodge not stopping when toggle is disabled\n- Added NeoStyk ESP\n- Added Anti WallDweller"
+    Title = "Version 0.45",
+    Content = "- Monster Dodge now lifts 160 studs above (unreachable)\n- Added Rare Currency variants to Currency ESP\n- Added Auto Loot Aura\n- Added Anti Pandemonium (all variants)\n- Added Anti Bouncer\n- Added Anti Skeleton Head\n- Added Noclip\n- Added Speed Changer"
 })
 Updates:CreateDivider()
 Updates:CreateParagraph({
-      Title = "Version 0.3 Fix update",
+    Title = "Version 0.4",
+    Content = "- Monster Dodge now lifts 80 studs above\n- Monster Dodge timeout increased to 40 seconds\n- Fixed Monster Dodge not stopping when toggle is disabled\n- Added NeoStyk ESP\n- Added Anti WallDweller\n- Removed Permanent Keycard (buggy)"
+})
+Updates:CreateDivider()
+Updates:CreateParagraph({
+    Title = "Version 0.3",
     Content = "- Fixed Monster Dodge (now lifts 50 studs above)\n- Fixed Generator ESP\n- Fixed toggles not properly disabling\n- Added Anti-Statue\n- Added Generator ESP\n- Improved performance\n- Added Changelog\n- Fixed Pandemonium notification spam\n- Fixed Anti toggles not working in every room"
 })
 
@@ -117,8 +122,15 @@ local MONSTERS = {
     Blitz = true, Squiddles = true, NaviAI = true, Void = true,
     RottenCoral = true, Searchlights = true, DefenseSystem = true,
     Froger = true, Chainsmoker = true, Pinkie = true,
-    -- Wall Dweller variants
     WallDweller = true, MeatWallDweller = true, RottenWallDweller = true,
+    Bouncer = true, SkeletonHead = true,
+}
+
+-- Pandemonium e todas as variantes
+local PANDEMONIUM_NAMES = {
+    Pandemonium = true, Anglemonium = true, Frogermonium = true,
+    Blitzemonium = true, Pandesmoker = true, Pinkimonium = true,
+    RidgePandemonium = true,
 }
 
 local CURRENCY_PATTERNS = {
@@ -136,6 +148,14 @@ local CURRENCY_PATTERNS = {
     { pattern = "^Currency50%-",   label = "50$",      fill = Color3.fromRGB(0,   150, 255), outline = Color3.fromRGB(80,  200, 255) },
     { pattern = "^Currency100%-",  label = "100$",     fill = Color3.fromRGB(255, 200, 0),   outline = Color3.fromRGB(255, 230, 100) },
     { pattern = "^Currency200%-",  label = "200$",     fill = Color3.fromRGB(255, 100, 0),   outline = Color3.fromRGB(255, 180, 80)  },
+    -- Rare Currency variants
+    { pattern = "^Caps$",          label = "Rare: Caps",         fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
+    { pattern = "^DoorsGold",      label = "Rare: Doors Gold",   fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
+    { pattern = "^GOLDDD$",        label = "Rare: GOLDDD",       fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
+    { pattern = "^HypnoCoin$",     label = "Rare: Hypno Coin",   fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
+    { pattern = "^Regret$",        label = "Rare: Regret",       fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
+    { pattern = "^Studs$",         label = "Rare: Studs",        fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
+    { pattern = "^SuperCredits$",  label = "Rare: Super Credits", fill = Color3.fromRGB(200, 0, 255), outline = Color3.fromRGB(255, 100, 255) },
     { pattern = "^RareCurrency",   label = "RARE$",    fill = Color3.fromRGB(200, 0,   255), outline = Color3.fromRGB(255, 100, 255) },
     { pattern = "^Blueprint$",     label = "Blueprint",fill = Color3.fromRGB(0,   180, 255), outline = Color3.fromRGB(100, 220, 255) },
 }
@@ -160,6 +180,10 @@ local function GetCurrencyConfig(name)
         end
     end
     return nil
+end
+
+local function IsCurrencyOrBlueprint(name)
+    return GetCurrencyConfig(name) ~= nil
 end
 
 local function GetRootPart()
@@ -625,14 +649,11 @@ Esp:CreateToggle({
 
 Auto:CreateSection("Safety")
 
--- Monster Dodge — corrigido para parar quando toggle é desligado
 local dodgeActive = false
-
 Auto:CreateToggle({
     Name = "Monster Dodge", CurrentValue = false, Flag = "MonsterDodge",
     Callback = function(Value)
         dodgeActive = Value
-
         if not Value then return end
 
         local platform      = nil
@@ -678,10 +699,10 @@ Auto:CreateToggle({
 
             freezePlayer(true)
 
-            -- 80 studs acima
+            -- 160 studs acima
             platform = Instance.new("Part")
             platform.Size = Vector3.new(10, 1, 10)
-            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 80, 0))
+            platform.CFrame = CFrame.new(savedCFrame.Position + Vector3.new(0, 160, 0))
             platform.Anchored = true
             platform.CanCollide = true
             platform.Transparency = 0.3
@@ -705,7 +726,6 @@ Auto:CreateToggle({
 
             local returned = false
 
-            -- Timeout de 40 segundos
             task.delay(40, function()
                 if dodging and not returned then
                     returned = true
@@ -713,7 +733,6 @@ Auto:CreateToggle({
                 end
             end)
 
-            -- Aguarda monstro desaparecer
             local waitConn
             waitConn = monsterInstance.AncestryChanged:Connect(function()
                 if monsterInstance:IsDescendantOf(workspace) or
@@ -737,16 +756,84 @@ Auto:CreateToggle({
         listenContainer(workspace)
         listenContainer(workspace.GameplayFolder.Monsters)
 
-        -- Monitora desligamento do toggle
         task.spawn(function()
             while dodgeActive do task.wait(0.3) end
-            -- Toggle foi desligado
             for _, c in ipairs(dodgeConns) do c:Disconnect() end
             dodgeConns = {}
             cleanupDodge()
             freezePlayer(false)
             dodging = false
         end)
+    end
+})
+
+Auto:CreateSection("Loot")
+
+-- Auto Loot Aura
+local lootActive = false
+local lootConns  = {}
+local selectedLoot = { Currency = false, KeyCards = false, Items = false }
+
+local KEYCARD_NAMES = { NormalKeyCard=true, InnerKeyCard=true, PasswordPaper=true, RidgeKeyCard=true }
+
+local function FireLootPrompts()
+    local root = GetRootPart()
+    if not root then return end
+
+    for _, room in ipairs(Rooms:GetChildren()) do
+        for _, d in ipairs(room:GetDescendants()) do
+            if d:IsA("ProximityPrompt") and d.Enabled then
+                local proxyPart = d.Parent
+                if not proxyPart or not proxyPart:IsA("BasePart") then continue end
+                local item = proxyPart.Parent
+                if not item then continue end
+
+                local dist = (root.Position - proxyPart.Position).Magnitude
+                if dist > 15 then continue end
+
+                local lootType = nil
+                if KEYCARD_NAMES[item.Name] then
+                    lootType = "KeyCards"
+                elseif IsCurrencyOrBlueprint(item.Name) then
+                    lootType = "Currency"
+                elseif GetItemConfig(item.Name) then
+                    lootType = "Items"
+                end
+
+                if lootType and selectedLoot[lootType] then
+                    pcall(fireproximityprompt, d)
+                end
+            end
+        end
+    end
+end
+
+Auto:CreateToggle({
+    Name = "Auto Loot Aura", CurrentValue = false, Flag = "AutoLootAura",
+    Callback = function(Value)
+        lootActive = Value
+        if Value then
+            task.spawn(function()
+                while lootActive do
+                    FireLootPrompts()
+                    task.wait(0.3)
+                end
+            end)
+        end
+    end
+})
+
+Auto:CreateDropdown({
+    Name = "Loot Type",
+    Options = {"Currency", "KeyCards", "Items"},
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "LootType",
+    Callback = function(Options)
+        selectedLoot = { Currency = false, KeyCards = false, Items = false }
+        for _, opt in ipairs(Options) do
+            selectedLoot[opt] = true
+        end
     end
 })
 
@@ -798,29 +885,95 @@ Anti:CreateToggle({
     end
 })
 
--- Anti WallDweller — remove do workspace diretamente
+-- Anti Pandemonium (todas as variantes)
+Anti:CreateToggle({
+    Name = "Remove Pandemonium", CurrentValue = false, Flag = "RemovePandemonium",
+    Callback = function(Value)
+        local conn = nil
+        local active = Value
+        if Value then
+            -- Remove existentes
+            for _, child in ipairs(workspace:GetChildren()) do
+                if PANDEMONIUM_NAMES[child.Name] then
+                    pcall(function() child:Destroy() end)
+                end
+            end
+            conn = workspace.ChildAdded:Connect(function(child)
+                if active and PANDEMONIUM_NAMES[child.Name] then
+                    pcall(function() child:Destroy() end)
+                end
+            end)
+        else
+            active = false
+            if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
+
+-- Anti WallDweller
 Anti:CreateToggle({
     Name = "Remove WallDweller", CurrentValue = false, Flag = "RemoveWallDweller",
     Callback = function(Value)
         local conn = nil
         local active = Value
         local WALLDWELLER_NAMES = {
-            WallDweller = true,
-            MeatWallDweller = true,
-            RottenWallDweller = true,
-            WallDwellers = true,
+            WallDweller = true, MeatWallDweller = true,
+            RottenWallDweller = true, WallDwellers = true,
         }
-
         if Value then
-            -- Remove existentes no workspace
             for _, child in ipairs(workspace:GetChildren()) do
                 if WALLDWELLER_NAMES[child.Name] then
                     pcall(function() child:Destroy() end)
                 end
             end
-            -- Remove novos
             conn = workspace.ChildAdded:Connect(function(child)
                 if active and WALLDWELLER_NAMES[child.Name] then
+                    pcall(function() child:Destroy() end)
+                end
+            end)
+        else
+            active = false
+            if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
+
+-- Anti Bouncer
+Anti:CreateToggle({
+    Name = "Remove Bouncer", CurrentValue = false, Flag = "RemoveBouncer",
+    Callback = function(Value)
+        local conn = nil
+        local active = Value
+        if Value then
+            local monstersFolder = workspace.GameplayFolder.Monsters
+            for _, child in ipairs(monstersFolder:GetChildren()) do
+                if child.Name == "Bouncer" then pcall(function() child:Destroy() end) end
+            end
+            conn = monstersFolder.ChildAdded:Connect(function(child)
+                if active and child.Name == "Bouncer" then
+                    pcall(function() child:Destroy() end)
+                end
+            end)
+        else
+            active = false
+            if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
+
+-- Anti Skeleton Head
+Anti:CreateToggle({
+    Name = "Remove Skeleton Head", CurrentValue = false, Flag = "RemoveSkeletonHead",
+    Callback = function(Value)
+        local conn = nil
+        local active = Value
+        if Value then
+            local monstersFolder = workspace.GameplayFolder.Monsters
+            for _, child in ipairs(monstersFolder:GetChildren()) do
+                if child.Name == "SkeletonHead" then pcall(function() child:Destroy() end) end
+            end
+            conn = monstersFolder.ChildAdded:Connect(function(child)
+                if active and child.Name == "SkeletonHead" then
                     pcall(function() child:Destroy() end)
                 end
             end)
@@ -879,6 +1032,59 @@ Anti:CreateToggle({
         else
             active = false
             if conn then conn:Disconnect() conn = nil end
+        end
+    end
+})
+
+-- ================================================
+-- MOVEMENT (no Auto tab, seção separada)
+-- ================================================
+
+Auto:CreateSection("Movement")
+
+-- Noclip
+local noclipConn = nil
+Auto:CreateToggle({
+    Name = "Noclip", CurrentValue = false, Flag = "Noclip",
+    Callback = function(Value)
+        if Value then
+            noclipConn = RunService.Stepped:Connect(function()
+                local char = Player.Character
+                if not char then return end
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end)
+        else
+            if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+            local char = Player.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+})
+
+-- Speed Changer
+local speedConn = nil
+Auto:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 150},
+    Increment = 1,
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        if not speedConn then
+            speedConn = RunService.Heartbeat:Connect(function()
+                local hum = GetHumanoid()
+                if hum then hum.WalkSpeed = Value end
+            end)
         end
     end
 })
